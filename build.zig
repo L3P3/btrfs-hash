@@ -163,7 +163,7 @@ pub fn build(b: *std.Build) void {
 	}
 	exe.linkSystemLibrary("uuid");
 	exe.linkSystemLibrary("blkid");
-	exe.linkSystemLibrary("libudev");
+	exe.linkSystemLibrary2("udev", .{ .use_pkg_config = .no });
 	exe.linkSystemLibrary("z");
 	exe.linkSystemLibrary("ssl");
 	exe.linkSystemLibrary("crypto");

@@ -39,12 +39,12 @@ jobs:
           sudo dpkg --add-architecture ${{ matrix.dpkg_arch }}
           sudo apt-get update
           sudo apt-get install -y \
-            libuuid-dev:${{ matrix.dpkg_arch }} \
+            libbtrfs-dev \
+            uuid-dev:${{ matrix.dpkg_arch }} \
             libblkid-dev:${{ matrix.dpkg_arch }} \
             libudev-dev:${{ matrix.dpkg_arch }} \
             zlib1g-dev:${{ matrix.dpkg_arch }} \
-            libssl-dev:${{ matrix.dpkg_arch }} \
-            libbtrfs-dev:${{ matrix.dpkg_arch }}
+            libssl-dev:${{ matrix.dpkg_arch }}
 
       - name: Build
         run: >

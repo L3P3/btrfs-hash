@@ -1,6 +1,20 @@
 const std = @import("std");
 
-const stderr = std.io.getStdErr().writer();
+const stderr_file = std.fs.File.stderr();
+
+fn errPrint(comptime fmt: []const u8, args: anytype) void {
+	var buf: [256]u8 = undefined;
+	var w = stderr_file.writer(&buf);
+	w.interface.print(fmt, args) catch {};
+	w.interface.flush() catch {};
+}
+
+fn errPrintTry(comptime fmt: []const u8, args: anytype) !void {
+	var buf: [256]u8 = undefined;
+	var w = stderr_file.writer(&buf);
+	try w.interface.print(fmt, args);
+	try w.interface.flush();
+}
 
 // Btrfs types are opaque to Zig (anonymous unions/structs in headers).
 // Field access and inline functions are provided by shim.c.
@@ -179,7 +193,7 @@ fn lookupExtent(
 		};
 		const result = btrfs_read_fs_root(device_info, &root_key);
 		if (isErrPtr(@ptrCast(result))) {
-			stderr.print("Error: Unable to read subvolume {d}\n", .{subvolid}) catch {};
+			errPrint("Error: Unable to read subvolume {d}\n", .{subvolid});
 			return false;
 		}
 		break :blk result orelse return false;
@@ -201,7 +215,7 @@ fn lookupExtent(
 
 	var ret = btrfs_search_slot(null, fs_root, &key, path, 0, 0);
 	if (ret < 0) {
-		stderr.print("Error: btrfs_search_slot failed with {d}\n", .{ret}) catch {};
+		errPrint("Error: btrfs_search_slot failed with {d}\n", .{ret});
 		return false;
 	}
 
@@ -276,12 +290,12 @@ const ResolveResult = struct {
 fn resolveDevice(file_path: [*:0]const u8) ?ResolveResult {
 	var resolved_buf: [std.posix.PATH_MAX]u8 = undefined;
 	const resolved = std.posix.realpathZ(file_path, &resolved_buf) catch {
-		stderr.print("Error: realpath failed for {s}\n", .{file_path}) catch {};
+		errPrint("Error: realpath failed for {s}\n", .{file_path});
 		return null;
 	};
 
 	const mntinfo = std.fs.openFileAbsolute("/proc/self/mountinfo", .{}) catch {
-		stderr.print("Error: Unable to open /proc/self/mountinfo\n", .{}) catch {};
+		errPrint("Error: Unable to open /proc/self/mountinfo\n", .{});
 		return null;
 	};
 	defer mntinfo.close();
@@ -293,10 +307,12 @@ fn resolveDevice(file_path: [*:0]const u8) ?ResolveResult {
 
 	var best_prefix_len: usize = 0;
 	var subvolid: u64 = BTRFS_FS_TREE_OBJECTID;
-	var line_buf: [8192]u8 = undefined;
-	const reader = mntinfo.reader();
+	var file_buf: [65536]u8 = undefined;
+	const bytes_read = mntinfo.readAll(&file_buf) catch 0;
+	const file_content = file_buf[0..bytes_read];
 
-	while (reader.readUntilDelimiter(&line_buf, '\n')) |line| {
+	var line_iter = std.mem.splitScalar(u8, file_content, '\n');
+	while (line_iter.next()) |line| {
 		// find " - btrfs " marker, right before the fs type
 		const marker = " - btrfs ";
 		const marker_pos = std.mem.indexOf(u8, line, marker) orelse continue;
@@ -343,10 +359,10 @@ fn resolveDevice(file_path: [*:0]const u8) ?ResolveResult {
 			subvolid = std.fmt.parseUnsigned(u64, opts[num_start..num_end], 10) catch
 				BTRFS_FS_TREE_OBJECTID;
 		}
-	} else |_| {}
+	}
 
 	if (best_prefix_len == 0) {
-		stderr.print("Error: Unable to determine block device for {s}\n", .{resolved}) catch {};
+		errPrint("Error: Unable to determine block device for {s}\n", .{resolved});
 		return null;
 	}
 
@@ -359,7 +375,7 @@ fn resolveDevice(file_path: [*:0]const u8) ?ResolveResult {
 
 fn directHash(file_path: [*:0]const u8) ?u64 {
 	const file = std.fs.cwd().openFileZ(file_path, .{}) catch |err| {
-		stderr.print("Error: Unable to open file {s}: {}\n", .{ file_path, err }) catch {};
+		errPrint("Error: Unable to open file {s}: {}\n", .{ file_path, err });
 		return null;
 	};
 	defer file.close();
@@ -368,7 +384,7 @@ fn directHash(file_path: [*:0]const u8) ?u64 {
 	var buf: [65536]u8 = undefined;
 	while (true) {
 		const n = file.read(&buf) catch |err| {
-			stderr.print("Error: Unable to read file {s}: {}\n", .{ file_path, err }) catch {};
+			errPrint("Error: Unable to read file {s}: {}\n", .{ file_path, err });
 			return null;
 		};
 		if (n == 0) break;
@@ -382,17 +398,17 @@ pub fn main() !void {
 	defer std.process.argsFree(std.heap.c_allocator, args);
 
 	if (args.len != 2) {
-		try stderr.print("Usage: btrfs-hash somehugefile.bin\n", .{});
+		try errPrintTry("Usage: btrfs-hash somehugefile.bin\n", .{});
 		std.process.exit(255);
 	}
 
 	const file_path: [*:0]const u8 = args[1];
 	const stat = std.posix.fstatat(std.posix.AT.FDCWD, std.mem.span(file_path), 0) catch {
-		try stderr.print("Error: Unable to access file {s}\n", .{file_path});
+		try errPrintTry("Error: Unable to access file {s}\n", .{file_path});
 		std.process.exit(255);
 	};
 	if (stat.mode & std.posix.S.IFMT != std.posix.S.IFREG) {
-		try stderr.print("Error: {s} is not a regular file.\n", .{file_path});
+		try errPrintTry("Error: {s} is not a regular file.\n", .{file_path});
 		std.process.exit(255);
 	}
 
@@ -403,16 +419,18 @@ pub fn main() !void {
 		.filename = @ptrCast(resolve.device_path.ptr),
 	};
 	const device_info = open_ctree_fs_info(&oca) orelse {
-		try stderr.print("Error: Unable to open block device {s}\n", .{resolve.device_path});
+		try errPrintTry("Error: Unable to open block device {s}\n", .{resolve.device_path});
 		std.process.exit(255);
 	};
 
 	var xxhash: u64 = 0;
 	if (!lookupExtent(device_info, stat.ino, resolve.subvolid, &xxhash)) {
-		stderr.print("Unable to lookup extent, falling back to direct read...\n", .{}) catch {};
+		errPrint("Unable to lookup extent, falling back to direct read...\n", .{});
 		xxhash = directHash(file_path) orelse std.process.exit(255);
 	}
 
-	const stdout = std.io.getStdOut().writer();
-	try stdout.print("{x:0>16}\n", .{xxhash});
+	var stdout_buf: [256]u8 = undefined;
+	var stdout = std.fs.File.stdout().writer(&stdout_buf);
+	try stdout.interface.print("{x:0>16}\n", .{xxhash});
+	try stdout.interface.flush();
 }

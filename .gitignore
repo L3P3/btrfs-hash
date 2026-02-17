@@ -1,3 +1,4 @@
 build/
 btrfs-progs/
 btrfs-hash
+.zig-cache/

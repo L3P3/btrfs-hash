@@ -21,7 +21,7 @@ sudo ./btrfs-hash somehugefile.bin
 
 ## Building
 
-On Debian, do this:
+Requires Debian and [Zig](https://ziglang.org/download/).
 
 ```bash
 git clone https://github.com/L3P3/btrfs-hash.git
@@ -30,6 +30,11 @@ make
 ```
 
 The result is the executable `btrfs-hash`.
+
+## Architecture
+
+Written in Zig, linking against [btrfs-progs](https://github.com/kdave/btrfs-progs) C sources which are compiled by Zig's built-in C compiler.
+A thin C shim (`shim.c`) provides access to btrfs struct fields and inline functions that Zig cannot translate due to anonymous unions and macro-generated accessors in the btrfs-progs headers.
 
 ## License
 
@@ -41,4 +46,4 @@ Heavily inspired by [dduper](https://github.com/Lakshmipathi/dduper).
 
 Which is also building on [btrfs-progs](https://github.com/kdave/btrfs-progs).
 
-And Copilot helped me a lot.
+And Copilot helped me a lot, it did almost all of the work.

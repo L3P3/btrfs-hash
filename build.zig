@@ -84,12 +84,12 @@ pub fn build(b: *std.Build) void {
 		.root_source_file = b.path("btrfs-hash.zig"),
 		.target = target,
 		.optimize = optimize,
+		.strip = true,
 	});
 
 	const exe = b.addExecutable(.{
 		.name = "btrfs-hash",
 		.root_module = root_mod,
-		.strip = true,
 	});
 
 	const btrfs_includes: []const []const u8 = &.{

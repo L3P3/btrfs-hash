@@ -34,32 +34,50 @@ jobs:
           mkdir -p btrfs-progs/include
           cp btrfs-progs-config.h btrfs-progs/include/config.h
 
-      - name: Install dependencies
+      - name: Setup QEMU (for container builds)
+        uses: docker/setup-qemu-action@v2
+
+      - name: Install native dependencies (x86 / x86_64)
+        if: ${{ matrix.arch == 'x86' || matrix.arch == 'x86_64' }}
         run: |
-          sudo dpkg --add-architecture ${{ matrix.dpkg_arch }}
           sudo apt-get update
-          sudo apt-get install -y \
-            libbtrfs-dev \
-            uuid-dev:${{ matrix.dpkg_arch }} \
-            libblkid-dev:${{ matrix.dpkg_arch }} \
-            libudev-dev:${{ matrix.dpkg_arch }} \
-            zlib1g-dev:${{ matrix.dpkg_arch }} \
-            libssl-dev:${{ matrix.dpkg_arch }}
+          sudo apt-get install -y libbtrfs-dev uuid-dev libblkid-dev libudev-dev zlib1g-dev libssl-dev
 
-      - name: Build
-        run: >
-          zig build
-          -Doptimize=ReleaseSmall
-          -Dtarget=${{ matrix.target }}
-          -Dsys-lib-dir=/usr/lib/${{ matrix.triplet }}
-          -Dsys-include-dir=/usr/include
-          -Dsys-include-dir2=/usr/include/${{ matrix.triplet }}
-          -p .
+      - name: Native build (x86 / x86_64)
+        if: ${{ matrix.arch == 'x86' || matrix.arch == 'x86_64' }}
+        run: |
+          zig build -Doptimize=ReleaseSmall -Dtarget=${{ matrix.target }} -Dsys-lib-dir=/usr/lib/${{ matrix.triplet }} -Dsys-include-dir=/usr/include -Dsys-include-dir2=/usr/include/${{ matrix.triplet }} -p .
 
-      - uses: actions/upload-artifact@v4
+      - name: Build in armv7 container
+        if: ${{ matrix.arch == 'armv7' }}
+        run: |
+          docker run --rm --platform linux/arm/v7 -v $PWD:/work -w /work arm32v7/ubuntu:24.04 bash -lc "set -e; apt-get update; apt-get install -y --no-install-recommends ca-certificates curl build-essential pkg-config uuid-dev libblkid-dev libudev-dev zlib1g-dev libssl-dev libbtrfs-dev; curl -L https://ziglang.org/download/0.15.2/zig-linux-armv7-0.15.2.tar.xz -o zig.tar.xz; tar -xJf zig.tar.xz; PATH=$PWD/zig-linux-armv7-0.15.2:$PATH zig build -Doptimize=ReleaseSmall -p .; cp btrfs-hash /work/btrfs-hash-armv7"
+
+      - name: Build in aarch64 container
+        if: ${{ matrix.arch == 'aarch64' }}
+        run: |
+          docker run --rm --platform linux/arm64/v8 -v $PWD:/work -w /work arm64v8/ubuntu:24.04 bash -lc "set -e; apt-get update; apt-get install -y --no-install-recommends ca-certificates curl build-essential pkg-config uuid-dev libblkid-dev libudev-dev zlib1g-dev libssl-dev libbtrfs-dev; curl -L https://ziglang.org/download/0.15.2/zig-linux-aarch64-0.15.2.tar.xz -o zig.tar.xz; tar -xJf zig.tar.xz; PATH=$PWD/zig-linux-aarch64-0.15.2:$PATH zig build -Doptimize=ReleaseSmall -p .; cp btrfs-hash /work/btrfs-hash-aarch64"
+
+      - name: Upload artifact (x86/x86_64)
+        if: ${{ matrix.arch == 'x86' || matrix.arch == 'x86_64' }}
+        uses: actions/upload-artifact@v4
         with:
           name: btrfs-hash-${{ matrix.arch }}
           path: btrfs-hash
+
+      - name: Upload artifact (armv7)
+        if: ${{ matrix.arch == 'armv7' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: btrfs-hash-armv7
+          path: btrfs-hash-armv7
+
+      - name: Upload artifact (aarch64)
+        if: ${{ matrix.arch == 'aarch64' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: btrfs-hash-aarch64
+          path: btrfs-hash-aarch64
 
   release:
     needs: build

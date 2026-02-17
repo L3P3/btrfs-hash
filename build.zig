@@ -124,12 +124,14 @@ pub fn build(b: *std.Build) void {
 		.flags = c_flags,
 	});
 
-	// compile x86_64 CRC32 PCL assembly
-	exe.addCSourceFiles(.{
-		.files = &btrfs_asm_sources,
-		.root = b.path("btrfs-progs"),
-		.flags = &.{},
-	});
+	// compile x86_64 CRC32 PCL assembly (only on x86_64)
+	if (target.result.cpu.arch == .x86_64) {
+		exe.addCSourceFiles(.{
+			.files = &btrfs_asm_sources,
+			.root = b.path("btrfs-progs"),
+			.flags = &.{},
+		});
+	}
 
 	// compile shim.c
 	exe.addCSourceFile(.{
@@ -142,7 +144,19 @@ pub fn build(b: *std.Build) void {
 		exe.addIncludePath(b.path(inc));
 	}
 
-	// system libraries
+	// system library/include paths (needed for cross-compilation)
+	const sys_lib_dir = b.option([]const u8, "sys-lib-dir", "System library directory");
+	if (sys_lib_dir) |dir| {
+		exe.addLibraryPath(.{ .cwd_relative = dir });
+	}
+	const sys_inc_dir = b.option([]const u8, "sys-include-dir", "System include directory");
+	if (sys_inc_dir) |dir| {
+		exe.addSystemIncludePath(.{ .cwd_relative = dir });
+	}
+	const sys_inc_dir2 = b.option([]const u8, "sys-include-dir2", "Additional system include directory");
+	if (sys_inc_dir2) |dir| {
+		exe.addSystemIncludePath(.{ .cwd_relative = dir });
+	}
 	exe.linkSystemLibrary("uuid");
 	exe.linkSystemLibrary("blkid");
 	exe.linkSystemLibrary("udev");

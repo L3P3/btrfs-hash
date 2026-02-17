@@ -1,0 +1,81 @@
+name: Build
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x86
+            target: x86-linux-gnu
+            triplet: i386-linux-gnu
+            dpkg_arch: i386
+          - arch: x86_64
+            target: x86_64-linux-gnu
+            triplet: x86_64-linux-gnu
+            dpkg_arch: amd64
+          - arch: armv7
+            target: arm-linux-gnueabihf
+            triplet: arm-linux-gnueabihf
+            dpkg_arch: armhf
+          - arch: aarch64
+            target: aarch64-linux-gnu
+            triplet: aarch64-linux-gnu
+            dpkg_arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mlugg/setup-zig@v2
+
+      - name: Clone btrfs-progs
+        run: |
+          git clone --depth 1 https://github.com/kdave/btrfs-progs.git
+          mkdir -p btrfs-progs/include
+          cp btrfs-progs-config.h btrfs-progs/include/config.h
+
+      - name: Install dependencies
+        run: |
+          sudo dpkg --add-architecture ${{ matrix.dpkg_arch }}
+          sudo apt-get update
+          sudo apt-get install -y \
+            libuuid-dev:${{ matrix.dpkg_arch }} \
+            libblkid-dev:${{ matrix.dpkg_arch }} \
+            libudev-dev:${{ matrix.dpkg_arch }} \
+            zlib1g-dev:${{ matrix.dpkg_arch }} \
+            libssl-dev:${{ matrix.dpkg_arch }} \
+            libbtrfs-dev:${{ matrix.dpkg_arch }}
+
+      - name: Build
+        run: >
+          zig build
+          -Doptimize=ReleaseSmall
+          -Dtarget=${{ matrix.target }}
+          -Dsys-lib-dir=/usr/lib/${{ matrix.triplet }}
+          -Dsys-include-dir=/usr/include
+          -Dsys-include-dir2=/usr/include/${{ matrix.triplet }}
+          -p .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: btrfs-hash-${{ matrix.arch }}
+          path: btrfs-hash
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+
+      - name: Rename binaries
+        run: |
+          for arch in x86 x86_64 armv7 aarch64; do
+            mv "btrfs-hash-${arch}/btrfs-hash" "btrfs-hash-${arch}"
+          done
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: btrfs-hash-*

@@ -39,7 +39,7 @@ jobs:
       - name: Build in x86 container
         if: ${{ matrix.arch == 'x86' }}
         run: |
-          docker run --rm --platform linux/386 -v $PWD:/work -w /work i386/ubuntu:24.04 bash -lc "set -e; apt-get update; apt-get install -y --no-install-recommends ca-certificates curl xz-utils build-essential pkg-config uuid-dev libblkid-dev libudev-dev zlib1g-dev libssl-dev libbtrfs-dev; curl -L https://ziglang.org/download/0.15.2/zig-linux-x86-0.15.2.tar.xz -o zig.tar.xz; tar -xJf zig.tar.xz; PATH=\$PWD/zig-linux-x86-0.15.2:\$PATH zig build -Doptimize=ReleaseSmall -p ."
+          docker run --rm --platform linux/i386 -v $PWD:/work -w /work debian:bookworm bash -lc "set -e; apt-get update; apt-get install -y --no-install-recommends ca-certificates curl xz-utils build-essential pkg-config uuid-dev libblkid-dev libudev-dev zlib1g-dev libssl-dev libbtrfs-dev; curl -L https://ziglang.org/download/0.15.2/zig-linux-x86-0.15.2.tar.xz -o zig.tar.xz; tar -xJf zig.tar.xz; PATH=\$PWD/zig-linux-x86-0.15.2:\$PATH zig build -Doptimize=ReleaseSmall -p ."
 
       - name: Build in armv7 container
         if: ${{ matrix.arch == 'armv7' }}

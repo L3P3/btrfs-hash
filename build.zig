@@ -108,6 +108,7 @@ pub fn build(b: *std.Build) void {
 		"-std=gnu11",
 		"-fno-strict-aliasing",
 		"-D_GNU_SOURCE",
+		"-DBTRFS_FLAT_INCLUDES",
 		"-Wno-unused-parameter",
 		"-include",
 		"btrfs-progs/include/config.h",
@@ -165,7 +166,6 @@ pub fn build(b: *std.Build) void {
 	exe.linkSystemLibrary("blkid");
 	exe.linkSystemLibrary2("udev", .{ .use_pkg_config = .no });
 	exe.linkSystemLibrary("z");
-	exe.linkSystemLibrary("ssl");
 	exe.linkSystemLibrary("crypto");
 	exe.linkLibC();
 

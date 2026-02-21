@@ -3,7 +3,7 @@
 BTRFS_CONFIG_TEMPLATE = $(CURDIR)/btrfs-progs-config.h
 BTRFS_CONFIG_HEADER = $(CURDIR)/btrfs-progs/include/config.h
 BTRFS_PROGS_REPO = git@github.com:kdave/btrfs-progs.git
-APT_PACKAGES = git libudev-dev libblkid-dev uuid-dev zlib1g-dev libssl-dev libbtrfs-dev
+APT_PACKAGES = git libudev-dev libblkid-dev uuid-dev zlib1g-dev libbtrfs-dev
 
 all: btrfs-hash
 

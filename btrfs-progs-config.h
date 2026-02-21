@@ -11,13 +11,13 @@
 /* #undef BTRFS_ZONED */
 
 /* Crypto implementation source name */
-#define CRYPTOPROVIDER "openssl"
+#define CRYPTOPROVIDER "builtin"
 
 /* Use Botan */
 #define CRYPTOPROVIDER_BOTAN 0
 
 /* Use builtin implementation */
-#define CRYPTOPROVIDER_BUILTIN 0
+#define CRYPTOPROVIDER_BUILTIN 1
 
 /* Use libcrypt */
 #define CRYPTOPROVIDER_LIBGCRYPT 0
@@ -29,7 +29,7 @@
 #define CRYPTOPROVIDER_LIBSODIUM 0
 
 /* Use OpenSSL */
-#define CRYPTOPROVIDER_OPENSSL 1
+#define CRYPTOPROVIDER_OPENSSL 0
 
 /* Define to 1 if you experimental and unstable features are build */
 #define EXPERIMENTAL 0
